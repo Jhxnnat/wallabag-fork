@@ -2,6 +2,7 @@ package fr.gaulupeau.apps.Poche.data;
 
 import android.app.Activity;
 import android.content.Context;
+import android.graphics.Typeface;
 import android.text.TextUtils;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
@@ -166,6 +167,18 @@ public class ListAdapter extends RecyclerView.Adapter<ListAdapter.ViewHolder> {
             }
 
             bindPreviewPicture(article);
+            applyFont();
+        }
+
+        private void applyFont() {
+            Typeface typeface = settings.isArticleFontSerif()
+                    ? Typeface.SERIF : Typeface.DEFAULT;
+
+            title.setTypeface(typeface);
+            url.setTypeface(typeface);
+            readingTime.setTypeface(typeface);
+            tags.setTypeface(typeface);
+            annotationCount.setTypeface(typeface);
         }
 
         private void bindPreviewPicture(Article article) {

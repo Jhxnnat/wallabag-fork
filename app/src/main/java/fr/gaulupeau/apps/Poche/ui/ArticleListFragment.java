@@ -75,6 +75,8 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
 
     private boolean forceContentUpdate;
 
+    private Boolean lastSerifFontSetting;
+
     public static ArticleListFragment newInstance(int listType, String tag) {
         ArticleListFragment fragment = new ArticleListFragment();
 
@@ -157,6 +159,20 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
 
     public void forceContentUpdate() {
         forceContentUpdate = true;
+    }
+
+    @Override
+    public void onResume() {
+        super.onResume();
+
+        // refresh the list when the "serif font" setting changed, so the typeface
+        // is applied without waiting for the next natural rebind
+        boolean serif = App.getSettings().isArticleFontSerif();
+        if (lastSerifFontSetting != null && lastSerifFontSetting != serif
+                && listAdapter != null) {
+            listAdapter.notifyDataSetChanged();
+        }
+        lastSerifFontSetting = serif;
     }
 
     @Override
