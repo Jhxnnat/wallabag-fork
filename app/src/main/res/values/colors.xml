@@ -20,4 +20,8 @@
     <color name="darkContrastWhite">#FFFFFF</color>
     <color name="darkContrastGray">#9c9c9c</color>
     <color name="splash_background">#222</color>
+    <color name="badgeBackground">#E0E0E0</color>
+    <color name="badgeTextColor">#333333</color>
+    <color name="annotationBadgeBackground">#FFF3CD</color>
+    <color name="listDivider">#55808080</color>
 </resources>

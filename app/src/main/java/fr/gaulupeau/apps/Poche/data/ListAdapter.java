@@ -2,6 +2,7 @@ package fr.gaulupeau.apps.Poche.data;
 
 import android.app.Activity;
 import android.content.Context;
+import android.text.TextUtils;
 import android.view.ContextMenu;
 import android.view.LayoutInflater;
 import android.view.MenuInflater;
@@ -17,7 +18,9 @@ import androidx.recyclerview.widget.RecyclerView;
 import java.util.List;
 
 import fr.gaulupeau.apps.InThePoche.R;
+import fr.gaulupeau.apps.Poche.network.ArticlePreviewImageLoader;
 import fr.gaulupeau.apps.Poche.data.dao.entities.Article;
+import fr.gaulupeau.apps.Poche.data.dao.entities.Tag;
 import fr.gaulupeau.apps.Poche.ui.ArticleActionsHelper;
 
 import static fr.gaulupeau.apps.Poche.data.ListTypes.LIST_TYPE_ARCHIVED;
@@ -83,6 +86,10 @@ public class ListAdapter extends RecyclerView.Adapter<ListAdapter.ViewHolder> {
         ImageView favourite;
         ImageView read;
         TextView readingTime;
+        TextView tags;
+        TextView annotationCount;
+        TextView metaSeparator;
+        ImageView previewPicture;
 
         ViewHolder(View itemView, OnItemClickListener listener) {
             super(itemView);
@@ -93,6 +100,10 @@ public class ListAdapter extends RecyclerView.Adapter<ListAdapter.ViewHolder> {
             favourite = itemView.findViewById(R.id.favourite);
             read = itemView.findViewById(R.id.read);
             readingTime = itemView.findViewById(R.id.estimatedReadingTime);
+            tags = itemView.findViewById(R.id.tags);
+            annotationCount = itemView.findViewById(R.id.annotationCount);
+            metaSeparator = itemView.findViewById(R.id.metaSeparator);
+            previewPicture = itemView.findViewById(R.id.previewPicture);
 
             itemView.setOnClickListener(this);
             itemView.setOnCreateContextMenuListener(this);
@@ -103,6 +114,9 @@ public class ListAdapter extends RecyclerView.Adapter<ListAdapter.ViewHolder> {
 
             title.setText(article.getTitle());
             url.setText(article.getDomain());
+
+            metaSeparator.setVisibility(
+                    TextUtils.isEmpty(article.getDomain()) ? View.GONE : View.VISIBLE);
 
             boolean showFavourite = false;
             boolean showRead = false;
@@ -125,6 +139,67 @@ public class ListAdapter extends RecyclerView.Adapter<ListAdapter.ViewHolder> {
             read.setVisibility(showRead ? View.VISIBLE : View.GONE);
             readingTime.setText(context.getString(R.string.listItem_estimatedReadingTime,
                     article.getEstimatedReadingTime(settings.getReadingSpeed())));
+
+            List<Tag> tagList = article.getTags();
+            if (tagList != null && !tagList.isEmpty()) {
+                Tag.sortTagListByLabel(tagList);
+
+                StringBuilder tagString = new StringBuilder();
+                for (Tag tag : tagList) {
+                    if (tagString.length() > 0) tagString.append(", ");
+                    tagString.append(tag.getLabel());
+                }
+
+                tags.setText(tagString.toString());
+                tags.setVisibility(View.VISIBLE);
+            } else {
+                tags.setVisibility(View.GONE);
+            }
+
+            int annotationTotal = article.getAnnotations().size();
+            if (annotationTotal > 0) {
+                annotationCount.setText(context.getString(
+                        R.string.listItem_annotationCount, annotationTotal));
+                annotationCount.setVisibility(View.VISIBLE);
+            } else {
+                annotationCount.setVisibility(View.GONE);
+            }
+
+            bindPreviewPicture(article);
+        }
+
+        private void bindPreviewPicture(Article article) {
+            String previewUrl = article.getPreviewPictureURL();
+
+            if (!settings.isPreviewImageEnabled() || TextUtils.isEmpty(previewUrl)) {
+                previewPicture.setVisibility(View.GONE);
+                previewPicture.setImageDrawable(null);
+                previewPicture.setTag(null);
+                return;
+            }
+
+            previewPicture.setVisibility(View.VISIBLE);
+            previewPicture.setImageDrawable(null);
+
+            final String tag = article.getId() + "|" + previewUrl;
+            previewPicture.setTag(tag);
+
+            Integer articleIdObject = article.getArticleId();
+            int articleId = articleIdObject != null ? articleIdObject : -1;
+
+            int targetSize = context.getResources()
+                    .getDimensionPixelSize(R.dimen.list_item_preview_size);
+
+            ArticlePreviewImageLoader.load(previewUrl, articleId, targetSize, bitmap -> {
+                if (!tag.equals(previewPicture.getTag())) return; // view was recycled
+
+                if (bitmap != null) {
+                    previewPicture.setImageBitmap(bitmap);
+                } else {
+                    // no image available: don't render anything
+                    previewPicture.setVisibility(View.GONE);
+                }
+            });
         }
 
         @Override
