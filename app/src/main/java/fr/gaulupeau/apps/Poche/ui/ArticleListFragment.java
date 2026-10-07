@@ -21,18 +21,24 @@ import org.greenrobot.greendao.query.QueryBuilder;
 import org.greenrobot.greendao.query.WhereCondition;
 
 import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Random;
+import java.util.Set;
 
 import fr.gaulupeau.apps.InThePoche.R;
 import fr.gaulupeau.apps.Poche.App;
 import fr.gaulupeau.apps.Poche.data.DbConnection;
 import fr.gaulupeau.apps.Poche.data.ListAdapter;
+import fr.gaulupeau.apps.Poche.data.dao.AnnotationDao;
 import fr.gaulupeau.apps.Poche.data.dao.ArticleDao;
 import fr.gaulupeau.apps.Poche.data.dao.ArticleTagsJoinDao;
 import fr.gaulupeau.apps.Poche.data.dao.DaoSession;
 import fr.gaulupeau.apps.Poche.data.dao.FtsDao;
 import fr.gaulupeau.apps.Poche.data.dao.TagDao;
+import fr.gaulupeau.apps.Poche.data.dao.entities.Annotation;
 import fr.gaulupeau.apps.Poche.data.dao.entities.Article;
 import fr.gaulupeau.apps.Poche.data.dao.entities.ArticleTagsJoin;
 import fr.gaulupeau.apps.Poche.data.dao.entities.Tag;
@@ -64,6 +70,8 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
 
     private ArticleDao articleDao;
     private TagDao tagDao;
+    private ArticleTagsJoinDao articleTagsJoinDao;
+    private AnnotationDao annotationDao;
 
     private boolean forceContentUpdate;
 
@@ -93,6 +101,8 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
         DaoSession daoSession = DbConnection.getSession();
         articleDao = daoSession.getArticleDao();
         tagDao = daoSession.getTagDao();
+        articleTagsJoinDao = daoSession.getArticleTagsJoinDao();
+        annotationDao = daoSession.getAnnotationDao();
 
         setHasOptionsMenu(true);
 
@@ -189,7 +199,9 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
         }
 
         try {
-            return detachObjects(qb.list());
+            List<Article> articles = detachObjects(qb.list());
+            loadTagsAndAnnotations(articles);
+            return articles;
         } catch (SQLException e) {
             if (e.getMessage() != null && e.getMessage().contains("malformed MATCH expression")) {
                 Log.i(TAG, "Ignoring \"malformed MATCH expression\" error from FTS", e);
@@ -257,6 +269,78 @@ public class ArticleListFragment extends RecyclerViewListFragment<Article, ListA
         }
 
         return articles;
+    }
+
+    /**
+     * Batch-loads tags and annotations for the given articles and attaches them to the entities,
+     * so that {@link Article#getTags()} and {@link Article#getAnnotations()} don't trigger a
+     * separate database query per list row during binding.
+     */
+    private void loadTagsAndAnnotations(List<Article> articles) {
+        if (articles.isEmpty()) return;
+
+        List<Long> articleIds = new ArrayList<>(articles.size());
+        for (Article article : articles) {
+            articleIds.add(article.getId());
+        }
+
+        // Tags
+        List<ArticleTagsJoin> joins = ArticleTagsJoin
+                .getTagsJoinByArticleQueryBuilder(articleIds, articleTagsJoinDao)
+                .list();
+
+        Set<Long> tagIds = new HashSet<>();
+        for (ArticleTagsJoin join : joins) {
+            tagIds.add(join.getTagId());
+        }
+
+        Map<Long, Tag> tagsById = new HashMap<>();
+        if (!tagIds.isEmpty()) {
+            for (Tag tag : tagDao.queryBuilder()
+                    .where(TagDao.Properties.Id.in(tagIds))
+                    .list()) {
+                tagsById.put(tag.getId(), tag);
+            }
+        }
+
+        Map<Long, List<Tag>> tagsByArticleId = new HashMap<>();
+        for (ArticleTagsJoin join : joins) {
+            Tag tag = tagsById.get(join.getTagId());
+            if (tag == null) continue;
+
+            List<Tag> articleTags = tagsByArticleId.get(join.getArticleId());
+            if (articleTags == null) {
+                articleTags = new ArrayList<>();
+                tagsByArticleId.put(join.getArticleId(), articleTags);
+            }
+            articleTags.add(tag);
+        }
+
+        // Annotations
+        List<Annotation> annotations = Annotation
+                .getAnnotationByArticlesQueryBuilder(articleIds, annotationDao)
+                .list();
+
+        Map<Long, List<Annotation>> annotationsByArticleId = new HashMap<>();
+        for (Annotation annotation : annotations) {
+            List<Annotation> articleAnnotations = annotationsByArticleId.get(
+                    annotation.getArticleId());
+            if (articleAnnotations == null) {
+                articleAnnotations = new ArrayList<>();
+                annotationsByArticleId.put(annotation.getArticleId(), articleAnnotations);
+            }
+            articleAnnotations.add(annotation);
+        }
+
+        // Attach the loaded relations so the lazy getters don't hit the database
+        for (Article article : articles) {
+            List<Tag> articleTags = tagsByArticleId.get(article.getId());
+            article.setTags(articleTags != null ? articleTags : new ArrayList<>());
+
+            List<Annotation> articleAnnotations = annotationsByArticleId.get(article.getId());
+            article.setAnnotations(articleAnnotations != null
+                    ? articleAnnotations : new ArrayList<>());
+        }
     }
 
     @Override
