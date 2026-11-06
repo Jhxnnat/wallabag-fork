@@ -6,7 +6,10 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.res.ColorStateList;
 import android.content.res.XmlResourceParser;
+import android.graphics.drawable.Drawable;
 import android.os.Bundle;
+import android.transition.ChangeBounds;
+import android.transition.TransitionManager;
 import android.text.Html;
 import android.text.Spanned;
 import android.text.TextUtils;
@@ -18,6 +21,7 @@ import android.view.Menu;
 import androidx.activity.OnBackPressedCallback;
 import android.view.MenuItem;
 import android.view.View;
+import android.view.ViewGroup;
 import android.widget.ProgressBar;
 import android.widget.TextView;
 import android.widget.Toast;
@@ -27,9 +31,11 @@ import androidx.annotation.NonNull;
 import androidx.appcompat.app.ActionBarDrawerToggle;
 import androidx.appcompat.app.AlertDialog;
 import androidx.appcompat.app.AppCompatActivity;
+import androidx.appcompat.content.res.AppCompatResources;
 import androidx.appcompat.widget.SearchView;
 import androidx.appcompat.widget.Toolbar;
 import androidx.core.graphics.Insets;
+import androidx.core.graphics.drawable.DrawableCompat;
 import androidx.core.view.GravityCompat;
 import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
@@ -39,6 +45,7 @@ import androidx.drawerlayout.widget.DrawerLayout;
 import androidx.fragment.app.Fragment;
 
 import com.google.android.material.appbar.AppBarLayout;
+import com.google.android.material.color.MaterialColors;
 import com.google.android.material.navigation.NavigationView;
 import com.mikepenz.aboutlibraries.Libs;
 import com.mikepenz.aboutlibraries.LibsBuilder;
@@ -82,6 +89,7 @@ public class MainActivity extends AppCompatActivity
     private static final String STATE_CURRENT_FRAGMENT = "active_fragment";
     private static final String STATE_SEARCH_QUERY = "search_query";
     private static final String STATE_SELECTED_TAG = "selected_tag";
+    private static final String STATE_SIDEBAR_VISIBLE = "sidebar_visible";
 
     private static final String FRAGMENT_ARTICLE_LISTS = "fragment_article_lists";
     private static final String FRAGMENT_TAG_LIST = "fragment_tag_list";
@@ -119,12 +127,16 @@ public class MainActivity extends AppCompatActivity
     private String searchQueryPrevious;
     private boolean searchUIPending;
     private String selectedTag;
+    private boolean sidebarVisible = true;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
         Log.d(TAG, "onCreate()");
         Themes.applyTheme(this, false);
         super.onCreate(savedInstanceState);
+
+        sidebarVisible = savedInstanceState == null
+                || savedInstanceState.getBoolean(STATE_SIDEBAR_VISIBLE, true);
 
         setContentView(R.layout.activity_main);
 
@@ -142,7 +154,7 @@ public class MainActivity extends AppCompatActivity
             @Override
             public void handleOnBackPressed() {
                 DrawerLayout drawer = findViewById(R.id.drawer_layout);
-                if (drawer.isDrawerOpen(GravityCompat.START)) {
+                if (drawer != null && drawer.isDrawerOpen(GravityCompat.START)) {
                     drawer.closeDrawer(GravityCompat.START);
                 } else {
                     this.setEnabled(false);
@@ -194,14 +206,12 @@ public class MainActivity extends AppCompatActivity
             openAbout();
         });
 
-        DrawerLayout drawer = findViewById(R.id.drawer_layout);
-        ViewCompat.setOnApplyWindowInsetsListener(drawer, (v, windowInsets) -> {
+        View mainContent = findViewById(R.id.main_content);
+        View rootView = findViewById(android.R.id.content);
+        ViewCompat.setOnApplyWindowInsetsListener(rootView, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            // Apply padding to the main content (first child) so it's not under the status bar
-            View content = drawer.getChildAt(0);
-            if (content != null) {
-                content.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-            }
+            // Apply padding to the main content so it's not under the system bars.
+            mainContent.setPadding(insets.left, insets.top, insets.right, insets.bottom);
             // The footer sits below the NavigationView, so it handles the bottom inset
             // instead of the NavigationView's menu.
             navigationFooter.setPadding(
@@ -216,37 +226,43 @@ public class MainActivity extends AppCompatActivity
                             Insets.of(insets.left, insets.top, insets.right, 0))
                     .build();
         });
-        ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
-                this, drawer, toolbar,
-                R.string.navigation_drawer_open,
-                R.string.navigation_drawer_close);
-        drawer.addDrawerListener(toggle);
-        toggle.syncState();
 
-        drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
-            boolean updated;
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
+        if (drawer != null) {
+            ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
+                    this, drawer, toolbar,
+                    R.string.navigation_drawer_open,
+                    R.string.navigation_drawer_close);
+            drawer.addDrawerListener(toggle);
+            toggle.syncState();
 
-            @Override
-            public void onDrawerSlide(View drawerView, float slideOffset) {
-                updateTime();
-            }
+            drawer.addDrawerListener(new DrawerLayout.SimpleDrawerListener() {
+                boolean updated;
 
-            @Override
-            public void onDrawerStateChanged(int newState) {
-                if (newState == DrawerLayout.STATE_IDLE) updated = false;
-            }
+                @Override
+                public void onDrawerSlide(View drawerView, float slideOffset) {
+                    updateTime();
+                }
 
-            private void updateTime() {
-                if (updated) return;
-                updated = true;
+                @Override
+                public void onDrawerStateChanged(int newState) {
+                    if (newState == DrawerLayout.STATE_IDLE) updated = false;
+                }
 
-                if (lastUpdateTimeView == null) return;
+                private void updateTime() {
+                    if (updated) return;
+                    updated = true;
 
-                Log.d(TAG, "DrawerListener.updateTime() updating time");
+                    if (lastUpdateTimeView == null) return;
 
-                updateLastUpdateTime();
-            }
-        });
+                    Log.d(TAG, "DrawerListener.updateTime() updating time");
+
+                    updateLastUpdateTime();
+                }
+            });
+        } else {
+            setupSidebarToggle(toolbar);
+        }
 
         progressBar = findViewById(R.id.progressBar);
 
@@ -342,6 +358,7 @@ public class MainActivity extends AppCompatActivity
         outState.putString(STATE_CURRENT_FRAGMENT, currentFragmentType);
         outState.putString(STATE_SELECTED_TAG, selectedTag);
         outState.putString(STATE_SEARCH_QUERY, searchQuery);
+        outState.putBoolean(STATE_SIDEBAR_VISIBLE, sidebarVisible);
     }
 
     @Override
@@ -358,6 +375,8 @@ public class MainActivity extends AppCompatActivity
     @Override
     protected void onResume() {
         super.onResume();
+
+        updateLastUpdateTime();
 
         AppBarLayout appBarLayout = findViewById(R.id.app_bar);
         appBarLayout.setExpanded(true, true);
@@ -554,6 +573,56 @@ public class MainActivity extends AppCompatActivity
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         if (drawer != null) {
             drawer.closeDrawer(GravityCompat.START);
+        }
+    }
+
+    private void setupSidebarToggle(Toolbar toolbar) {
+        Drawable icon = AppCompatResources.getDrawable(this, R.drawable.ic_menu_24dp);
+        if (icon != null) {
+            icon = DrawableCompat.wrap(icon).mutate();
+            DrawableCompat.setTint(icon,
+                    MaterialColors.getColor(toolbar, androidx.appcompat.R.attr.colorControlNormal));
+            toolbar.setNavigationIcon(icon);
+        }
+        toolbar.setNavigationOnClickListener(v -> toggleSidebar());
+        updateSidebarToggleContentDescription();
+
+        if (!sidebarVisible) {
+            View sidebar = findViewById(R.id.nav_drawer);
+            ViewGroup.LayoutParams lp = sidebar.getLayoutParams();
+            lp.width = 0;
+            sidebar.setLayoutParams(lp);
+            sidebar.setImportantForAccessibility(
+                    View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+        }
+    }
+
+    private void toggleSidebar() {
+        View sidebar = findViewById(R.id.nav_drawer);
+        if (sidebar == null || !(sidebar.getParent() instanceof ViewGroup)) return;
+
+        ViewGroup root = (ViewGroup) sidebar.getParent();
+        ViewGroup.LayoutParams lp = sidebar.getLayoutParams();
+        int fullWidth = getResources().getDimensionPixelSize(R.dimen.nav_drawer_width);
+
+        sidebarVisible = !sidebarVisible;
+
+        TransitionManager.beginDelayedTransition(root, new ChangeBounds());
+        lp.width = sidebarVisible ? fullWidth : 0;
+        sidebar.setLayoutParams(lp);
+        sidebar.setImportantForAccessibility(sidebarVisible
+                ? View.IMPORTANT_FOR_ACCESSIBILITY_AUTO
+                : View.IMPORTANT_FOR_ACCESSIBILITY_NO_HIDE_DESCENDANTS);
+
+        updateSidebarToggleContentDescription();
+    }
+
+    private void updateSidebarToggleContentDescription() {
+        Toolbar toolbar = findViewById(R.id.toolbar);
+        if (toolbar != null) {
+            toolbar.setNavigationContentDescription(sidebarVisible
+                    ? R.string.navigation_drawer_close
+                    : R.string.navigation_drawer_open);
         }
     }
 
