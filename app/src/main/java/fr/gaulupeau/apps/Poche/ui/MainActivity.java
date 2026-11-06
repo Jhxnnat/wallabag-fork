@@ -182,6 +182,18 @@ public class MainActivity extends AppCompatActivity
             }
         }
 
+        View navigationFooter = findViewById(R.id.nav_footer);
+        final int navigationFooterPaddingBottom = navigationFooter.getPaddingBottom();
+
+        findViewById(R.id.nav_footer_settings).setOnClickListener(v -> {
+            closeDrawer();
+            openSettings();
+        });
+        findViewById(R.id.nav_footer_about).setOnClickListener(v -> {
+            closeDrawer();
+            openAbout();
+        });
+
         DrawerLayout drawer = findViewById(R.id.drawer_layout);
         ViewCompat.setOnApplyWindowInsetsListener(drawer, (v, windowInsets) -> {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
@@ -190,8 +202,19 @@ public class MainActivity extends AppCompatActivity
             if (content != null) {
                 content.setPadding(insets.left, insets.top, insets.right, insets.bottom);
             }
-            // Pass insets to other children (like NavigationView)
-            return windowInsets;
+            // The footer sits below the NavigationView, so it handles the bottom inset
+            // instead of the NavigationView's menu.
+            navigationFooter.setPadding(
+                    navigationFooter.getPaddingLeft(),
+                    navigationFooter.getPaddingTop(),
+                    navigationFooter.getPaddingRight(),
+                    navigationFooterPaddingBottom + insets.bottom);
+            // Strip the bottom inset so the NavigationView doesn't add a second gap
+            // above the footer.
+            return new WindowInsetsCompat.Builder(windowInsets)
+                    .setInsets(WindowInsetsCompat.Type.systemBars(),
+                            Insets.of(insets.left, insets.top, insets.right, 0))
+                    .build();
         });
         ActionBarDrawerToggle toggle = new ActionBarDrawerToggle(
                 this, drawer, toolbar,
@@ -493,38 +516,45 @@ public class MainActivity extends AppCompatActivity
             case R.id.nav_add:
                 showAddBagDialog();
                 break;
-
-            case R.id.nav_settings:
-                startActivity(new Intent(getBaseContext(), SettingsActivity.class));
-                break;
-
-            case R.id.nav_about:
-                Libs.ActivityStyle style;
-                switch (Themes.getCurrentTheme()) {
-                    case DARK:
-                    case DARK_CONTRAST:
-                        style = Libs.ActivityStyle.DARK;
-                        break;
-
-                    default:
-                        style = Libs.ActivityStyle.LIGHT_DARK_TOOLBAR;
-                        break;
-                }
-                CharSequence aboutCharSequence = getText(R.string.aboutText);
-                String aboutString = aboutCharSequence instanceof Spanned
-                        ? Html.toHtml((Spanned) aboutCharSequence)
-                        : aboutCharSequence.toString();
-                new LibsBuilder()
-                        .withActivityStyle(style)
-                        .withAboutIconShown(true)
-                        .withAboutVersionShown(true)
-                        .withAboutDescription(aboutString)
-                        .start(this);
-                break;
         }
 
-        this.<DrawerLayout>findViewById(R.id.drawer_layout).closeDrawer(GravityCompat.START);
+        closeDrawer();
         return true;
+    }
+
+    private void openSettings() {
+        startActivity(new Intent(getBaseContext(), SettingsActivity.class));
+    }
+
+    private void openAbout() {
+        Libs.ActivityStyle style;
+        switch (Themes.getCurrentTheme()) {
+            case DARK:
+            case DARK_CONTRAST:
+                style = Libs.ActivityStyle.DARK;
+                break;
+
+            default:
+                style = Libs.ActivityStyle.LIGHT_DARK_TOOLBAR;
+                break;
+        }
+        CharSequence aboutCharSequence = getText(R.string.aboutText);
+        String aboutString = aboutCharSequence instanceof Spanned
+                ? Html.toHtml((Spanned) aboutCharSequence)
+                : aboutCharSequence.toString();
+        new LibsBuilder()
+                .withActivityStyle(style)
+                .withAboutIconShown(true)
+                .withAboutVersionShown(true)
+                .withAboutDescription(aboutString)
+                .start(this);
+    }
+
+    private void closeDrawer() {
+        DrawerLayout drawer = findViewById(R.id.drawer_layout);
+        if (drawer != null) {
+            drawer.closeDrawer(GravityCompat.START);
+        }
     }
 
     @Override

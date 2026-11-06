@@ -1,0 +1,55 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:id="@+id/nav_drawer"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="?android:attr/windowBackground"
+    android:elevation="16dp"
+    android:orientation="vertical">
+
+    <com.google.android.material.navigation.NavigationView
+        android:id="@+id/nav_view"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:elevation="0dp"
+        app:headerLayout="@layout/nav_header_main"
+        app:menu="@menu/activity_main_drawer"/>
+
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="1dp"
+        android:background="?android:attr/dividerHorizontal"/>
+
+    <LinearLayout
+        android:id="@+id/nav_footer"
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:orientation="horizontal">
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/nav_footer_settings"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/nav_footer_height"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/nav_other_settings"
+            android:scaleType="center"
+            app:srcCompat="@drawable/ic_settings_black_24dp"
+            app:tint="?attr/colorControlNormal"/>
+
+        <androidx.appcompat.widget.AppCompatImageButton
+            android:id="@+id/nav_footer_about"
+            android:layout_width="0dp"
+            android:layout_height="@dimen/nav_footer_height"
+            android:layout_weight="1"
+            android:background="?attr/selectableItemBackground"
+            android:contentDescription="@string/nav_other_about"
+            android:scaleType="center"
+            app:srcCompat="@drawable/ic_info_outline_black_24dp"
+            app:tint="?attr/colorControlNormal"/>
+    </LinearLayout>
+
+</LinearLayout>
