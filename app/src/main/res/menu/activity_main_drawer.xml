@@ -5,9 +5,17 @@
         android:id="@+id/nav_group_main"
         android:checkableBehavior="single">
         <item
-            android:id="@+id/nav_mainLists"
-            android:icon="@drawable/ic_menu_articles"
-            android:title="@string/nav_main_articles"/>
+            android:id="@+id/nav_favorites"
+            android:icon="@drawable/ic_menu_favorites"
+            android:title="@string/feedName_favorites"/>
+        <item
+            android:id="@+id/nav_unread"
+            android:icon="@drawable/ic_menu_unread"
+            android:title="@string/feedName_unread"/>
+        <item
+            android:id="@+id/nav_archived"
+            android:icon="@drawable/ic_menu_archive"
+            android:title="@string/feedName_archived"/>
         <item
             android:id="@+id/nav_tags"
             android:icon="@drawable/ic_menu_tags"

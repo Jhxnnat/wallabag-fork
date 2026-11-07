@@ -1,0 +1,5 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- The permanent sidebar is the primary filter navigation on tablets. -->
+    <bool name="show_article_list_tabs">false</bool>
+</resources>

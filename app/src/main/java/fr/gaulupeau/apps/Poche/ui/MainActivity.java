@@ -77,9 +77,14 @@ import fr.gaulupeau.apps.Poche.service.workers.ArticleUpdater;
 import fr.gaulupeau.apps.Poche.ui.preferences.ConfigurationTestHelper;
 import fr.gaulupeau.apps.Poche.ui.preferences.SettingsActivity;
 
+import static fr.gaulupeau.apps.Poche.data.ListTypes.LIST_TYPE_ARCHIVED;
+import static fr.gaulupeau.apps.Poche.data.ListTypes.LIST_TYPE_FAVORITES;
+import static fr.gaulupeau.apps.Poche.data.ListTypes.LIST_TYPE_UNREAD;
+
 public class MainActivity extends AppCompatActivity
         implements NavigationView.OnNavigationItemSelectedListener,
-        TagListFragment.OnFragmentInteractionListener {
+        TagListFragment.OnFragmentInteractionListener,
+        ArticleListsFragment.OnListTypeChangedListener {
 
     public static final String PARAM_TAG_LABEL = "tag_label";
 
@@ -90,6 +95,7 @@ public class MainActivity extends AppCompatActivity
     private static final String STATE_SEARCH_QUERY = "search_query";
     private static final String STATE_SELECTED_TAG = "selected_tag";
     private static final String STATE_SIDEBAR_VISIBLE = "sidebar_visible";
+    private static final String STATE_ARTICLE_LIST_TYPE = "article_list_type";
 
     private static final String FRAGMENT_ARTICLE_LISTS = "fragment_article_lists";
     private static final String FRAGMENT_TAG_LIST = "fragment_tag_list";
@@ -128,6 +134,7 @@ public class MainActivity extends AppCompatActivity
     private boolean searchUIPending;
     private String selectedTag;
     private boolean sidebarVisible = true;
+    private int currentArticleListType = LIST_TYPE_UNREAD;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -137,6 +144,9 @@ public class MainActivity extends AppCompatActivity
 
         sidebarVisible = savedInstanceState == null
                 || savedInstanceState.getBoolean(STATE_SIDEBAR_VISIBLE, true);
+        currentArticleListType = savedInstanceState == null
+                ? LIST_TYPE_UNREAD
+                : savedInstanceState.getInt(STATE_ARTICLE_LIST_TYPE, LIST_TYPE_UNREAD);
 
         setContentView(R.layout.activity_main);
 
@@ -359,6 +369,7 @@ public class MainActivity extends AppCompatActivity
         outState.putString(STATE_SELECTED_TAG, selectedTag);
         outState.putString(STATE_SEARCH_QUERY, searchQuery);
         outState.putBoolean(STATE_SIDEBAR_VISIBLE, sidebarVisible);
+        outState.putInt(STATE_ARTICLE_LIST_TYPE, currentArticleListType);
     }
 
     @Override
@@ -524,8 +535,16 @@ public class MainActivity extends AppCompatActivity
     @Override
     public boolean onNavigationItemSelected(@NonNull MenuItem item) {
         switch (item.getItemId()) {
-            case R.id.nav_mainLists:
-                setCurrentFragment(FRAGMENT_ARTICLE_LISTS);
+            case R.id.nav_favorites:
+                selectArticleList(LIST_TYPE_FAVORITES);
+                break;
+
+            case R.id.nav_unread:
+                selectArticleList(LIST_TYPE_UNREAD);
+                break;
+
+            case R.id.nav_archived:
+                selectArticleList(LIST_TYPE_ARCHIVED);
                 break;
 
             case R.id.nav_tags:
@@ -539,6 +558,19 @@ public class MainActivity extends AppCompatActivity
 
         closeDrawer();
         return true;
+    }
+
+    private void selectArticleList(int listType) {
+        currentArticleListType = listType;
+
+        if (FRAGMENT_ARTICLE_LISTS.equals(currentFragmentType)) {
+            if (currentFragment instanceof ArticleListsFragment) {
+                ((ArticleListsFragment) currentFragment).setListType(listType);
+            }
+            updateNavigationUI(FRAGMENT_ARTICLE_LISTS);
+        } else {
+            setCurrentFragment(FRAGMENT_ARTICLE_LISTS);
+        }
     }
 
     private void openSettings() {
@@ -758,6 +790,11 @@ public class MainActivity extends AppCompatActivity
 
         setSortOrder(fragment);
         setSearchQueryOnFragment(fragment, searchQuery);
+
+        if (FRAGMENT_ARTICLE_LISTS.equals(currentFragmentType)
+                && fragment instanceof ArticleListsFragment) {
+            ((ArticleListsFragment) fragment).setListType(currentArticleListType);
+        }
     }
 
     private void switchSortOrder() {
@@ -914,7 +951,7 @@ public class MainActivity extends AppCompatActivity
         @IdRes int itemID = 0;
         switch (type) {
             case FRAGMENT_ARTICLE_LISTS:
-                itemID = R.id.nav_mainLists;
+                itemID = getArticleListItemId(currentArticleListType);
                 break;
 
             case FRAGMENT_TAG_LIST:
@@ -950,6 +987,28 @@ public class MainActivity extends AppCompatActivity
         if (title != null) {
             setTitle(title);
         }
+    }
+
+    @IdRes
+    private int getArticleListItemId(int listType) {
+        switch (listType) {
+            case LIST_TYPE_FAVORITES:
+                return R.id.nav_favorites;
+
+            case LIST_TYPE_ARCHIVED:
+                return R.id.nav_archived;
+
+            default:
+                return R.id.nav_unread;
+        }
+    }
+
+    @Override
+    public void onListTypeChanged(int listType) {
+        if (!FRAGMENT_ARTICLE_LISTS.equals(currentFragmentType)) return;
+
+        currentArticleListType = listType;
+        updateNavigationUI(FRAGMENT_ARTICLE_LISTS);
     }
 
     @Override

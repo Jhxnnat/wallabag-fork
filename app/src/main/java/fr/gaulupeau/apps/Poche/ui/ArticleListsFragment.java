@@ -1,6 +1,7 @@
 package fr.gaulupeau.apps.Poche.ui;
 
 import android.app.Activity;
+import android.content.Context;
 import android.os.Bundle;
 import android.util.Log;
 import android.view.LayoutInflater;
@@ -32,6 +33,7 @@ public class ArticleListsFragment extends Fragment
 
     private static final String STATE_SORT_ORDER = "sort_order";
     private static final String STATE_SEARCH_QUERY = "search_query";
+    private static final String STATE_LIST_TYPE = "list_type";
 
     private static final EnumSet<ArticlesChangedEvent.ChangeType> CHANGE_SET = EnumSet.of(
             ArticlesChangedEvent.ChangeType.UNSPECIFIED,
@@ -54,6 +56,13 @@ public class ArticleListsFragment extends Fragment
 
     private Sortable.SortOrder sortOrder;
     private String searchQuery;
+    private int pendingListType = -1;
+
+    private OnListTypeChangedListener listTypeChangedListener;
+
+    public interface OnListTypeChangedListener {
+        void onListTypeChanged(int listType);
+    }
 
     public static ArticleListsFragment newInstance(String tag) {
         ArticleListsFragment fragment = new ArticleListsFragment();
@@ -86,8 +95,27 @@ public class ArticleListsFragment extends Fragment
             if (searchQuery == null) {
                 searchQuery = savedInstanceState.getString(STATE_SEARCH_QUERY);
             }
+            if (pendingListType == -1) {
+                pendingListType = savedInstanceState.getInt(STATE_LIST_TYPE, -1);
+            }
         }
         if (sortOrder == null) sortOrder = SortOrder.DESC;
+    }
+
+    @Override
+    public void onAttach(@NonNull Context context) {
+        super.onAttach(context);
+
+        if (context instanceof OnListTypeChangedListener) {
+            listTypeChangedListener = (OnListTypeChangedListener) context;
+        }
+    }
+
+    @Override
+    public void onDetach() {
+        super.onDetach();
+
+        listTypeChangedListener = null;
     }
 
     @Override
@@ -111,6 +139,12 @@ public class ArticleListsFragment extends Fragment
             public void onPageSelected(int position) {
                 Log.v(TAG, "onPageSelected() position: " + position);
 
+                pendingListType = ArticleListsPagerAdapter.PAGES[position];
+
+                if (listTypeChangedListener != null) {
+                    listTypeChangedListener.onListTypeChanged(pendingListType);
+                }
+
                 setParametersToFragment(getCurrentFragment());
             }
         });
@@ -118,7 +152,16 @@ public class ArticleListsFragment extends Fragment
         TabLayout tabLayout = view.findViewById(R.id.articles_list_tab_layout);
         tabLayout.setupWithViewPager(viewPager);
 
-        viewPager.setCurrentItem(1);
+        if (!getResources().getBoolean(R.bool.show_article_list_tabs)) {
+            tabLayout.setVisibility(View.GONE);
+        }
+
+        int initialPosition = pendingListType != -1
+                ? ArticleListsPagerAdapter.positionByListType(pendingListType)
+                : 1;
+        if (initialPosition == -1) initialPosition = 1;
+
+        viewPager.setCurrentItem(initialPosition, false);
 
         return view;
     }
@@ -131,6 +174,18 @@ public class ArticleListsFragment extends Fragment
 
         if (sortOrder != null) outState.putInt(STATE_SORT_ORDER, sortOrder.ordinal());
         if (searchQuery != null) outState.putString(STATE_SEARCH_QUERY, searchQuery);
+        outState.putInt(STATE_LIST_TYPE, pendingListType);
+    }
+
+    public void setListType(int listType) {
+        pendingListType = listType;
+
+        if (viewPager != null) {
+            int position = ArticleListsPagerAdapter.positionByListType(listType);
+            if (position != -1) {
+                viewPager.setCurrentItem(position, false);
+            }
+        }
     }
 
     @Override

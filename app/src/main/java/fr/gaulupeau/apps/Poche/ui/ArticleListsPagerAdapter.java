@@ -59,6 +59,10 @@ class ArticleListsPagerAdapter extends CachingPagerAdapter {
                 break;
         }
 
+        return positionByListType(listType);
+    }
+
+    static int positionByListType(int listType) {
         for(int i = 0; i < PAGES.length; i++) {
             if(listType == PAGES[i]) return i;
         }
